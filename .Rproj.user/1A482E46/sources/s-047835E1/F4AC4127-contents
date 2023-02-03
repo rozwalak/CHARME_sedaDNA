@@ -186,7 +186,7 @@ y.scale <- c(1948,
 y.tks <- c(1948:2014)
 
 p.col <- c(rep("forestgreen", times=7), rep("gold2", times=20))
-ma.dist <- vegdist(Sheldon.ma, method="bray", binary=FALSE, diag=FALSE, upper=FALSE, na.rm = FALSE) 
+ma.dist <- vegdist(Sheldon.rioja, method="bray", binary=FALSE, diag=FALSE, upper=FALSE, na.rm = FALSE) 
 ma.chclust <- chclust(ma.dist, method="coniss")
 
 pol.plot <- strat.plot(Sheldon.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.bar=p.col, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.005, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Sheldon Cove", ylabel = "Age",
@@ -195,3 +195,59 @@ pol.plot <- strat.plot(Sheldon.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, 
 Sheldon_rioja <- addClustZone(pol.plot, ma.chclust, nZone=3, lwd=1.5, lty=2, col="grey25")
 
 svg("output/Sheldon.svg")
+
+
+################################################################################
+
+#Ochrophyta - Sheldon
+
+Sheldon_ochrophyta <- rel_abundance %>%
+  merge(taxo) %>%
+  filter(Phylum == "Ochrophyta") %>%
+  select(Genus,Total,e062,e063,e064,e065,e066,e069,e070,e071,e072,e073,e074,e075,e076,e077,e078,e079,e080,e081) %>%
+  drop_na() %>%
+  group_by(Genus) %>% 
+  summarize_at(vars(Total,e062,e063,e064,e065,e066,e069,e070,e071,e072,e073,e074,e075,e076,e077,e078,e079,e080,e081), funs(sum))
+
+Sheldon_ochrophyta <- data.frame(t(Sheldon_ochrophyta)) %>%
+  row_to_names(row_number = 1) %>%
+  rownames_to_column("DNA_ID")
+Sheldon_ochrophyta <- Sheldon_ochrophyta[-1, ] %>%
+  merge(metadata)
+Sheldon_ochrophyta[2:6] <- sapply(Sheldon_ochrophyta[2:6],as.numeric)
+
+Sheldon_ochrophyta.rioja <- Sheldon_ochrophyta %>%
+  arrange(Age) %>%
+  select(where(~ any(. != 0))) %>%
+  select(-DNA_ID,-Age,-Site) 
+
+y.scale <- c(1948,
+             1950,
+             1953,
+             1956,
+             1958,
+             1961,
+             1964,
+             1967,
+             1970,
+             1972,
+             1973,
+             1975,
+             1979,
+             1986,
+             1993,
+             2000,
+             2007,
+             2014)
+
+y.tks <- c(1948:2014)
+
+p.col <- c(rep("forestgreen", times=7), rep("gold2", times=20))
+ma.dist <- vegdist(Sheldon_ochrophyta.rioja, method="bray", binary=FALSE, diag=FALSE, upper=FALSE, na.rm = FALSE) 
+ma.chclust <- chclust(ma.dist, method="coniss")
+
+pol.plot <- strat.plot(Sheldon_ochrophyta.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=TRUE, col.bar=p.col, lwd.bar=0.01, scale.percent=FALSE, xSpace=0.05, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Sheldon Cove Dinoflagellates - Genera", ylabel = "Age",
+                       srt.xlabel=70, ylabPos=3)
+
+Sheldon_rioja <- addClustZone(pol.plot, ma.chclust, nZone=3, lwd=1.5, lty=2, col="grey25")
+

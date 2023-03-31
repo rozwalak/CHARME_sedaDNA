@@ -10,11 +10,11 @@ library(svglite)
 library(viridis)
 
 #read dataframe
-df <- read_excel("input/ATP23-002_Analiza.xlsx", sheet = "Analiza V9 - combine")
+df <- read_excel("input/ATP23-012_Analiza.xlsx", sheet = "Analiza-merged")
 
 #metadata
-meta <- read_excel("input/ATP23-002_Analiza.xlsx", sheet = "Metadata")
-ages <- read_excel("input/Dating.xlsx")
+meta <- read_excel("input/ATP23-012_Analiza.xlsx", sheet = "Metadata")
+ages <- read_excel("input/Dating_biomarkers.xlsx")
 metadata <- merge(meta, ages) %>%
   select(DNA_ID, Age, Site)
 
@@ -40,13 +40,13 @@ rel_abundance <- data.frame(t(rel_abundance)) %>%
   row_to_names(row_number = 1) %>%
   rownames_to_column("DNA_ID") %>%
   merge(metadata) 
-rel_abundance[2:3562] <- sapply(rel_abundance[2:3562],as.numeric)
+rel_abundance[2:3724] <- sapply(rel_abundance[2:3724],as.numeric)
 rel_abundance <- rel_abundance %>%
   arrange(Age) %>%
   select(where(~ any(. != 0)))
 
 #make community matrix - extract columns with abundance information
-com = rel_abundance[,2:2514]
+com = rel_abundance[,2:2548]
 
 #turn abundance data frame into a matrix
 m_com = as.matrix(com)
@@ -72,8 +72,9 @@ nmds_plot = ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) +
         legend.title = element_text(size = 14, colour = "black", face = "bold"), 
         panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, linewidth = 1.2),
         legend.key=element_blank()) + 
-  labs(x = "NMDS1", colour = "Site", y = "NMDS2", shape = "Type") +
-  scale_color_viridis(discrete = FALSE)
+  labs(x = "NMDS1", colour = "Age", y = "NMDS2", shape = "Site") +
+  scale_color_viridis(discrete = FALSE) +
+  geom_text(aes(label = Age), size = 4, vjust = 1.5)
 nmds_plot
 stressplot(nmds)
 ggsave("nMDS_CHARME.png", plot = nmds_plot , bg = "white", width = 12, height = 8, device = "png", path = "output")

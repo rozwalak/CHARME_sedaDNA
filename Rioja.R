@@ -1,7 +1,3 @@
-install.packages("rioja")
-install.packages("analogue")
-install.packages("janitor")
-install.packages("svglite")
 library(vegan)
 library(rioja)
 library(readxl)
@@ -15,21 +11,22 @@ library(svglite)
 #Data preparation
 
 #raw_data
-df <- read_excel("input/ATP23-002_Analiza.xlsx", sheet = "Analiza V9 - combine")
-
+df <- read_excel("input/ATP23-012_Analiza.xlsx", sheet = "Analiza-merged")
+polarella <- read_excel("output/Polarella_abundance.xlsx")
 #metadata
-meta <- read_excel("input/ATP23-002_Analiza.xlsx", sheet = "Metadata")
-ages <- read_excel("input/Dating.xlsx")
+meta <- read_excel("input/ATP23-012_Analiza.xlsx", sheet = "Metadata")
+ages <- read_excel("input/Dating_biomarkers.xlsx")
 metadata <- merge(meta, ages) %>%
-  select(DNA_ID, Age, Site)
+  inner_join(polarella) %>%
+  select(DNA_ID, Age, Site, Polarella_glacialis, IPSO25, HBI_III, HBI_IV)
 
 #taxonomy dataframe
 taxo <- df %>%
   separate(Taxon, c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>%
   select(1:8)
 
-#only numbers about abundance
-matrix <- df %>% select(1, 3:51) %>%
+#only abundance
+matrix <- df %>% select(1, 3:56) %>%
   column_to_rownames(var="#ASV ID")
 
 #relative abundance of matrix
@@ -38,21 +35,20 @@ rel_abundance <- make_relative(matrix_t)
 rel_abundance <- t(rel_abundance)
 rel_abundance <- data.frame(rel_abundance) %>%
   mutate(Total = rowSums(.)) %>%
+  mutate_at(vars(), ~ . * 100) %>%
   rownames_to_column("#ASV ID") %>%
   merge(taxo)
-
-rel_abundance_phylum_stat <- rel_abundance %>% 
-  group_by(Phylum) %>% 
-  summarise(Frequency = sum(Total))
 
 ################################################################################
 
 Marian_rel_abundance_phylum <- rel_abundance %>%
-  select(53, 2:51) %>%
+  select(53, 2:63) %>%
   select(Phylum,Total,e013,e051,e052,e053,e054,e084,e085,e086,e087,e088) %>%
   drop_na() %>%
   group_by(Phylum) %>% 
-  summarize_at(vars(Total,e013,e051,e052,e053,e054,e084,e085,e086,e087,e088), funs(sum))
+  summarize_at(vars(Total,e013,e051,e052,e053,e054,e084,e085,e086,e087,e088), funs(sum)) %>%
+  arrange(desc(Total)) %>% slice(1:48) %>%
+  arrange(Total)
 
 Marian<- data.frame(t(Marian_rel_abundance_phylum)) %>%
   row_to_names(row_number = 1) %>%
@@ -64,11 +60,13 @@ Marian[2:49] <- sapply(Marian[2:49],as.numeric)
 ################################################################################
 
 Borgen_rel_abundance_phylum <- rel_abundance %>%
-  select(53, 2:51) %>%
-  select(Phylum,Total,e028,e057,e058,e059,e082,e083) %>%
+  select(53, 2:63) %>%
+  select(Phylum,Total,e028,e057,e058,e059,e082,e083,e089,e090,e091,e092,e093,e094) %>%
   drop_na() %>%
   group_by(Phylum) %>% 
-  summarize_at(vars(Total,e028,e057,e058,e059,e082,e083), funs(sum))
+  summarize_at(vars(Total,e028,e057,e058,e059,e082,e083,e089,e090,e091,e092,e093,e094), funs(sum)) %>%
+  arrange(desc(Total)) %>% slice(1:48) %>%
+  arrange(Total)
 
 Borgen <- data.frame(t(Borgen_rel_abundance_phylum)) %>%
   row_to_names(row_number = 1) %>%
@@ -80,18 +78,20 @@ Borgen[2:49] <- sapply(Borgen[2:49],as.numeric)
 ################################################################################
 
 Sheldon_rel_abundance_phylum <- rel_abundance %>%
-  select(53, 2:51) %>%
+  select(53, 2:63) %>%
   select(Phylum,Total,e062,e063,e064,e065,e066,e069,e070,e071,e072,e073,e074,e075,e076,e077,e078,e079,e080,e081) %>%
   drop_na() %>%
   group_by(Phylum) %>% 
-  summarize_at(vars(Total,e062,e063,e064,e065,e066,e069,e070,e071,e072,e073,e074,e075,e076,e077,e078,e079,e080,e081), funs(sum))
+  summarize_at(vars(Total,e062,e063,e064,e065,e066,e069,e070,e071,e072,e073,e074,e075,e076,e077,e078,e079,e080,e081), funs(sum)) %>%
+  arrange(desc(Total)) %>% slice(1:48) %>%
+  arrange(Total)
 
 Sheldon <- data.frame(t(Sheldon_rel_abundance_phylum)) %>%
   row_to_names(row_number = 1) %>%
   rownames_to_column("DNA_ID")
 Sheldon <- Sheldon[-1, ] %>%
   merge(metadata)
-Sheldon[2:49] <- sapply(Sheldon[2:49],as.numeric)
+Sheldon[2:51] <- sapply(Sheldon[2:51],as.numeric)
 
 ################################################################################
 #Rioja Marian
@@ -114,14 +114,18 @@ y.scale <- c(1972,
 
 y.tks <- c(1972:2017)
 
-p.col <- c(rep("forestgreen", times=7), rep("gold2", times=20))
+matrix_marian <- as.matrix(read_excel("input/rioja_matrix_marian.xlsx", col_names = FALSE))
+
+c.poly <- c(rep("#00A087FF", times=39), rep("#3C548877", times=4))
+
+
 ma.dist <- vegdist(Marian.rioja, method="bray", binary=FALSE, diag=FALSE, upper=FALSE, na.rm = FALSE) 
 ma.chclust <- chclust(ma.dist, method="coniss")
 
-pol.plot <- strat.plot(Marian.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.bar=p.col, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.005, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Marian Cove", ylabel = "Age",
-                       srt.xlabel=70, clust=ma.chclust, ylabPos=3)
+pol.plot <- strat.plot(Marian.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.poly = c.poly, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.006, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Marian Cove", ylabel = "Age",
+                       srt.xlabel=40, clust=ma.chclust, ylabPos=3, minmax = matrix_marian)
 
-Marian_rioja <- addClustZone(pol.plot, ma.chclust, nZone=2, lwd=1.5, lty=2, col="grey25")
+Marian_rioja <- addClustZone(pol.plot, ma.chclust, nZone=3, lwd=1.5, lty=2, col="grey25")
 
 svg("output/Marian.svg")
 
@@ -134,35 +138,42 @@ Borgen.rioja <- Borgen %>%
   select(where(~ any(. != 0))) %>%
   select(-DNA_ID,-Age,-Site) 
 
-y.scale <- c(1966,
-             1968,
+y.scale <- c(1965,
+             1966,
+             1967.2,
+             1967.8,
+             1968.4,
+             1968.7,
              1969,
-             1970,
+             1969.3,
+             1974,
+             1990,
              1998,
              2014)
 
-y.tks <- c(1966:2014)
+y.tks <- c(1965:2014)
 
-p.col <- c(rep("forestgreen", times=7), rep("gold2", times=20))
+c.poly <- c(rep("#00A087FF", times=36), rep("#3C548877", times=4))
+
+matrix_borgen <- as.matrix(read_excel("input/rioja_matrix_borgen.xlsx", col_names = FALSE))
+
 ma.dist <- vegdist(Borgen.rioja, method="bray", binary=FALSE, diag=FALSE, upper=FALSE, na.rm = FALSE) 
 ma.chclust <- chclust(ma.dist, method="coniss")
 
-pol.plot <- strat.plot(Borgen.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.bar=p.col, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.005, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Börgen Bay", ylabel = "Age",
-                       srt.xlabel=70, clust=ma.chclust, ylabPos=3)
+pol.plot <- strat.plot(Borgen.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.poly = c.poly, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.006, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Borgen Bay", ylabel = "Age",
+                       srt.xlabel=40, clust=ma.chclust, ylabPos=3, minmax = matrix_borgen)
 
-Borgen_rioja <- addClustZone(pol.plot, ma.chclust, nZone=2, lwd=1.5, lty=2, col="grey25")
+Borgen_rioja <- addClustZone(pol.plot, ma.chclust, nZone=4, lwd=1.5, lty=2, col="grey25")
 
 svg("output/Borgen.svg")
-
-
 
 ################################################################################
 #Rioja Sheldon
 
 Sheldon.rioja <- Sheldon %>%
   arrange(Age) %>%
-  select(where(~ any(. != 0))) %>%
-  select(-DNA_ID,-Age,-Site) 
+  select(-DNA_ID,-Age,-Site) %>%
+  select(where(~ any(. != 0)))
 
 y.scale <- c(1948,
              1950,
@@ -185,14 +196,17 @@ y.scale <- c(1948,
              
 y.tks <- c(1948:2014)
 
-p.col <- c(rep("forestgreen", times=7), rep("gold2", times=20))
+c.poly <- c(rep("#00A087FF", times=43), rep("#3C548899", times=4))
+
+matrix_sheldon <- as.matrix(read_excel("input/rioja_matrix_sheldon.xlsx", col_names = FALSE))
+
 ma.dist <- vegdist(Sheldon.rioja, method="bray", binary=FALSE, diag=FALSE, upper=FALSE, na.rm = FALSE) 
 ma.chclust <- chclust(ma.dist, method="coniss")
 
-pol.plot <- strat.plot(Sheldon.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.bar=p.col, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.005, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, title = "Sheldon Cove", ylabel = "Age",
-                       srt.xlabel=70, clust=ma.chclust, ylabPos=3)
+pol.plot <- strat.plot(Sheldon.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=TRUE, plot.bar=FALSE, col.poly = c.poly, lwd.bar=0.001, scale.percent=FALSE, xSpace=0.006, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, ylabel = "Age",
+                       srt.xlabel=50, clust=ma.chclust, ylabPos=3, cex.xlabel =  1.3, minmax = matrix_sheldon)
 
-Sheldon_rioja <- addClustZone(pol.plot, ma.chclust, nZone=3, lwd=1.5, lty=2, col="grey25")
+Sheldon_rioja <- addClustZone(pol.plot, ma.chclust, nZone=4, lwd=1.5, lty=2, col="grey25")
 
 svg("output/Sheldon.svg")
 
@@ -250,4 +264,39 @@ pol.plot <- strat.plot(Sheldon_ochrophyta.rioja, yvar=y.scale, y.tks=y.scale, y.
                        srt.xlabel=70, ylabPos=3)
 
 Sheldon_rioja <- addClustZone(pol.plot, ma.chclust, nZone=3, lwd=1.5, lty=2, col="grey25")
+
+
+
+################################################################################
+
+Sheldon_biomarkers.rioja <- Sheldon %>%
+  arrange(Age) %>%
+  select(where(~ any(. != 0))) %>%
+  select(`Polarella glacialis`, `IPSO25 (ng/g)`, `HBI III (ng/g)`, `HBI IV (ng/g)`) 
+
+y.scale <- c(1948,
+             1950,
+             1953,
+             1956,
+             1958,
+             1961,
+             1964,
+             1967,
+             1970,
+             1972,
+             1973,
+             1975,
+             1979,
+             1986,
+             1993,
+             2000,
+             2007,
+             2014)
+
+y.tks <- c(1948:2014)
+
+pol.plot <- strat.plot(Sheldon_biomarkers.rioja, yvar=y.scale, y.tks=y.scale, y.rev=FALSE, plot.line=TRUE, plot.poly=FALSE, plot.bar=FALSE, lwd.bar=0.01, scale.percent=TRUE, xSpace=0.05, x.pc.lab=TRUE, x.pc.omit0=TRUE, las=2, ylabel = "Age",  title = "Sheldon Cove",
+                       srt.xlabel=0, ylabPos=3, lwd.line=3, horiz=TRUE)
+
+
 

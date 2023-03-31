@@ -1,0 +1,90 @@
+library(readxl)
+library(writexl)
+library(tidyverse)
+library(janitor)
+library(ggpubr)
+library(gam)
+library(visreg)
+library(AER)
+library(mgcv)
+
+install.packages("visreg")
+
+
+#read dataframe Polarella
+df_polarella <- read_excel("input/ATP23-012_Analiza.xlsx", sheet = "P.glacialis (%)") %>%
+  filter(Reference == "All identified Dinoflagellata") %>%
+  select(-Reference)
+df_polarella_t <- t(df_polarella)
+df_polarella <- data.frame(df_polarella_t) %>%
+  row_to_names(row_number = 1) %>%
+  rownames_to_column("DNA_ID")
+
+df_polarella$`Polarella_glacialis` <- df_polarella$`6.66666666666667`
+df_polarella <- df_polarella[,-2]
+#df_polarella$`Polarella glacialis` = as.numeric(as.character(df_polarella$`Polarella glacialis`)) 
+
+write_xlsx(df_polarella, "output/Polarella_abundance.xlsx")
+#read dataframe Hill numbers
+df_hills <- read_excel("output/hill_Antarctica.xlsx")
+
+#merge dataframes
+df <- inner_join(df_polarella, df_hills)
+
+df_marian <- df %>%
+  filter(Site == "Marian Cove")
+
+df_borgen <- df %>%
+  filter(Site == "Börgen Bay")
+
+df_sheldon <- df %>%
+  filter(Site == "Sheldon Cove")
+
+
+m1_marian <- gam(Hill_N0 ~ Polarella_glacialis, 
+          data = df_marian, family = "poisson"); summary(m1_marian)
+visreg(m1_marian, scale = "response")
+
+m1_borgen <- gam(Hill_N0 ~ Polarella_glacialis, 
+                  data = df_borgen, family = "poisson"); summary(m1_borgen)
+visreg(m1_borgen, scale = "response")
+
+m1_sheldon <- gam(Hill_N1 ~ Polarella_glacialis, 
+                  data = df_sheldon, family = "poisson"); summary(m1_sheldon)
+visreg(m1_sheldon, scale = "response")
+
+hist(residuals(m1, type = "pearson"))
+dispersiontest(m1)
+
+
+library(glmmTMB)
+library(car)
+
+
+
+m0 <- glmmTMB(Hill_N0 ~ 1, 
+                    data = df_sheldon_bio, family = "nbinom2"); summary(m0)
+
+m2 <- glmmTMB(Hill_N0 ~ Polarella_glacialis, 
+              data = df_sheldon_bio, family = "nbinom2"); summary(m2)
+
+m3 <- glmmTMB(Hill_N0 ~ Polarella_glacialis + HBI_III, 
+              data = df_sheldon_bio, family = "nbinom2"); summary(m3)
+
+
+visreg(m2, "Polarella_glacialis", scale = "response")
+visreg(m2, "HBI_III", scale = "response")
+
+plot(residuals(m2) ~ fitted(m2))
+
+anova(m0, m2, m3, test = "Chisq")
+
+AIC(m0,m2,m3)
+
+exp(-0.031014)
+
+
+biomarkers <- readxl::read_xlsx("input/Dating_biomarkers.xlsx")
+
+df_sheldon_bio <- inner_join(df_sheldon, biomarkers)
+names(df_sheldon_bio)[2] <- "Polarella_glacialis"
